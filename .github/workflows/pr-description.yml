@@ -3,10 +3,9 @@ name: Generate PR Description
 on:
   workflow_call:
     inputs:
-      node-version:
-        required: false
+      targetKeyword:
+        required: true
         type: string
-        default: '18'
 
 jobs:
   generate-description:
@@ -39,7 +38,7 @@ jobs:
 
             if (baseBranch === "main" || baseBranch === "master" ) {
               //  絞り込みたいキーワード（例: "NPRTRACE"）
-              const targetKeyword = "NPRTRACE-";
+              const targetKeyword = "{{inputs.targetKeyword}}-";
 
               // コミットメッセージを抽出・フィルタ・ソート
               const commitMessages = commits.data

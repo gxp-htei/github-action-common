@@ -1,0 +1,94 @@
+name: Generate PR Description
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        required: false
+        type: string
+        default: '18'
+
+jobs:
+  generate-description:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v3
+
+      - name: PRの内容を取得
+        id: pr_data
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const commits = await github.rest.pulls.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+
+            const baseBranch = pr.data.base.ref; // ← ここでマージ先を取得
+
+            let commitMessages;
+
+            if (baseBranch === "main" || baseBranch === "master" ) {
+              //  絞り込みたいキーワード（例: "NPRTRACE"）
+              const targetKeyword = "NPRTRACE-";
+
+              // コミットメッセージを抽出・フィルタ・ソート
+              const commitMessages = commits.data
+                .map(c => c.commit.message.split('\n')[0].trim()) // タイトルのみで改行や余分な空白を除去
+                .filter(msg => msg.includes(targetKeyword)) // キーワードに一致する行だけ
+                .sort() // アルファベット順（辞書順）にソート
+                .map(msg => `- ${msg}`) // フォーマット整形
+                .join('\n');
+
+            } else {
+              // フルメッセージ（複数行）
+              commitMessages = commits.data
+                .map(c => c.commit.message.trim()) // 改行や余分な空白を除去
+                .sort() // アルファベット順（辞書順）にソート
+                .join('\n');
+            }
+              
+
+            return {
+              body: JSON.stringify(pr.data.body || "").slice(1, -1),
+              commits: JSON.stringify(commitMessages).slice(1, -1)
+            };
+
+      - name: PR本文を更新
+        uses: actions/github-script@v6
+        with:
+          script: |
+            try{
+              const raw = `${{ steps.pr_data.outputs.result }}`;
+
+              const result = JSON.parse(raw);
+              const { body, commits } = result;
+
+              if (body && body.trim().length > 0) {
+                console.log(" PR body already exists. Skipping update.");
+              } else {
+                const generated = `このPRに含まれるコミット:\n${commits}`;
+
+                await github.rest.pulls.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.payload.pull_request.number,
+                  body: generated,
+                });
+
+                console.log(" PR description updated with commit messages.");
+              }
+            } catch (error) {
+              console.log(" JSON parsing failed. Skipping PR description update.");
+              console.log("Error:", error.message);
+              return; // エラーが発生したらここで終了
+            }

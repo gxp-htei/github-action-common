@@ -25,7 +25,7 @@ jobs:
               repo: context.repo.repo,
               pull_number: context.payload.pull_request.number,
             });
-
+            console.log("inputs.targetKeyword : ${{inputs.targetKeyword}}");
             const pr = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -38,7 +38,7 @@ jobs:
 
             if (baseBranch === "main" || baseBranch === "master" ) {
               //  絞り込みたいキーワード（例: "NPRTRACE"）
-              const targetKeyword = "{{inputs.targetKeyword}}-";
+              const targetKeyword = "${{inputs.targetKeyword}}-";
 
               // コミットメッセージを抽出・フィルタ・ソート
               const commitMessages = commits.data
